@@ -38,7 +38,8 @@
   "dependencies": {
     "axios": "^1.8.4",
     "axios-retry": "^4.5.0",
-    "form-data": "^4.0.2"
+    "form-data": "^4.0.2",
+    "reve-sdk": "github:caseygauss/reve-sdk#main"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
