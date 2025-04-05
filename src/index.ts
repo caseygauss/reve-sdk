@@ -18,7 +18,7 @@ export const IS_TEST_ENV = process.env.NODE_ENV === 'test';
 export class ReveAI {
   private apiClient: AxiosInstance;
   private options: Required<Omit<ReveAIOptions, 'auth' | 'projectId'>> & { 
-    auth: ReveAIOptions['auth'];
+    auth: Required<ReveAIOptions['auth']>;
     projectId?: string;
     verbose: boolean;
     customHeaders: ReveAIOptions['customHeaders'];
@@ -36,17 +36,21 @@ export class ReveAI {
       throw new ReveAIError('Authentication options are required', ReveAIErrorType.AUTHENTICATION_ERROR);
     }
     
-    const { authorization, cookie } = options.auth;
+    const { authorization, cookie, reve_version } = options.auth;
     
-    if (!authorization || !cookie) {
+    if (!authorization || !cookie || !reve_version) {
       throw new ReveAIError(
-        'Authorization header and cookie are required',
+        'Authorization header, cookie, and reve_version are required in auth options',
         ReveAIErrorType.AUTHENTICATION_ERROR
       );
     }
     
     this.options = {
-      auth: options.auth,
+      auth: {
+        authorization: authorization,
+        cookie: cookie,
+        reve_version: reve_version,
+      },
       projectId: options.projectId || undefined,
       baseUrl: options.baseUrl ?? 'https://preview.reve.art',
       timeout: options.timeout ?? 30000,
@@ -177,9 +181,12 @@ export class ReveAI {
     // Add request interceptor to add auth token and cookie
     this.apiClient.interceptors.request.use(
       (config) => {
-        // Add authorization and cookie headers to every request
+        // Add authorization header
         config.headers.authorization = this.options.auth.authorization;
-        config.headers.cookie = this.options.auth.cookie;
+        
+        // Combine cookies
+        const combinedCookie = `${this.options.auth.cookie}; reve_version=${this.options.auth.reve_version}`;
+        config.headers.cookie = combinedCookie;
         
         // Add any custom headers
         Object.entries(this.options.customHeaders).forEach(([key, value]) => {

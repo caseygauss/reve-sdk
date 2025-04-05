@@ -11,6 +11,11 @@ export interface AuthOptions {
    * Cookie value for authentication
    */
   cookie: string;
+
+  /**
+   * Reve version cookie value
+   */
+  reve_version: string;
 }
 
 /**
