@@ -132,6 +132,12 @@ export interface EditImageOptions extends Omit<GenerateImageOptions, 'batchSize'
   originatingGeneration: string;
 
   /**
+   * Optional: The enhanced prompt (caption) from the original image generation.
+   * Used as context for generating the edit prompt.
+   */
+  originalCaption?: string;
+
+  /**
    * Optional: Annotated prompt (if available from a previous step or context)
    * This can sometimes help guide the edit more precisely.
    */
@@ -247,6 +253,11 @@ export interface EditImageResult extends BaseImageResult {
    * The generation ID of the original image that was edited
    */
   originatingGeneration: string;
+
+  /**
+   * The final enhanced prompt generated and used for this specific edit.
+   */
+  finalCaption: string;
 
   /**
    * The annotated prompt that might have been used during the edit
