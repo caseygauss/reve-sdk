@@ -683,7 +683,7 @@ export class ReveAI {
         client_metadata: {
           aspectRatio: `${width}:${height}`,
           instruction: instruction, // The edit instruction
-          optimizeEnabled: false, // No prompt optimization during edit
+          optimizeEnabled: true, // No prompt optimization during edit
           originatingGeneration: originatingGeneration, // ID of the image to edit
           unexpandedPrompt: options.prompt, // Original prompt
           // Include annotatedPrompt if provided
