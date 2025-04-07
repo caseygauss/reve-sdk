@@ -204,6 +204,18 @@ export interface GenerateImageResult {
   prompt: string;
 
   /**
+   * The actual caption used for generation (could be the original or enhanced prompt).
+   * Only provided when batch size is 1.
+   */
+  caption?: string;
+
+  /**
+   * Array of all captions used for generation (could be original or enhanced prompts).
+   * Only provided when batch size > 1.
+   */
+  captions?: string[];
+
+  /**
    * The enhanced prompt used for generation (if prompt enhancement was enabled).
    * For single image generations, this will be the enhanced prompt used.
    * For multi-image generations, this will be the first enhanced prompt used.

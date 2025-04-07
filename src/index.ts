@@ -306,6 +306,7 @@ export class ReveAI {
     seed: number;
     generationId: string;
     enhancedPrompt?: string;
+    caption: string;
   }> {
     // Get project ID
     const projectId = await this.getProjectId();
@@ -389,7 +390,8 @@ export class ReveAI {
         imageUrl: 'https://example.com/test-image.jpg',
         seed: -1,
         generationId: `test-gen-${Date.now()}`,
-        enhancedPrompt: shouldEnhancePrompt ? finalPrompt : undefined
+        enhancedPrompt: shouldEnhancePrompt ? finalPrompt : undefined,
+        caption: finalPrompt,
       };
     }
 
@@ -419,7 +421,8 @@ export class ReveAI {
       imageUrl: result.imageUrls[0],
       seed: result.seed,
       generationId: generationIdFromResponse,
-      enhancedPrompt: shouldEnhancePrompt && finalPrompt !== prompt ? finalPrompt : undefined
+      enhancedPrompt: shouldEnhancePrompt && finalPrompt !== prompt ? finalPrompt : undefined,
+      caption: finalPrompt,
     };
   }
 
@@ -593,6 +596,9 @@ export class ReveAI {
 
       const results = await Promise.all(generationPromises);
       
+      // Collect all captions used
+      const usedCaptions = results.map(r => r.caption);
+      
       // Collect all enhanced prompts that were actually used
       const usedEnhancedPrompts = results
         .map(r => r.enhancedPrompt)
@@ -607,6 +613,9 @@ export class ReveAI {
         seed: results[0].seed, // Use the first seed as the reference
         completedAt: new Date(),
         prompt,
+        // Return the actual caption used
+        caption: usedCaptions.length === 1 ? usedCaptions[0] : undefined,
+        captions: usedCaptions.length > 1 ? usedCaptions : undefined,
         // Only include enhanced prompt properties when enhancePrompt is true
         ...(enhancePrompt && usedEnhancedPrompts.length > 0 ? {
           // Return an array of all enhanced prompts if there are multiple, otherwise just the first one
