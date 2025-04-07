@@ -4,10 +4,12 @@ import {
   ReveAIOptions,
   GenerateImageOptions,
   GenerateImageResult,
+  EditImageOptions,
+  EditImageResult,
   ReveAIError,
   ReveAIErrorType,
 } from './types';
-import { delay, handleAxiosError, validateImageOptions, parseJwt } from './utils/helpers';
+import { delay, handleAxiosError, validateImageOptions, validateEditImageOptions, parseJwt } from './utils/helpers';
 
 // Flag for testing environment
 export const IS_TEST_ENV = process.env.NODE_ENV === 'test';
@@ -294,14 +296,15 @@ export class ReveAI {
    * Generate a single image using Reve AI
    * @param options Options for image generation
    * @param enhancedPrompt Optional pre-enhanced prompt to use
-   * @returns Promise resolving to the generation result with image URL
+   * @returns Promise resolving to the generation result with image URL, seed, and generation ID
    */
   private async generateSingleImage(
-    options: GenerateImageOptions, 
+    options: GenerateImageOptions,
     enhancedPrompt?: string
   ): Promise<{
     imageUrl: string;
     seed: number;
+    generationId: string;
     enhancedPrompt?: string;
   }> {
     // Get project ID
@@ -359,7 +362,7 @@ export class ReveAI {
           unexpandedPrompt: prompt
         },
         inference_inputs: {
-          caption: finalPrompt, // Use the enhanced or original prompt
+          caption: finalPrompt,
           height: height,
           negative_caption: negativePrompt,
           seed: seed === -1 ? Math.floor(Math.random() * 10000000) : seed,
@@ -384,7 +387,9 @@ export class ReveAI {
     if (IS_TEST_ENV && !generationResponse.data) {
       return {
         imageUrl: 'https://example.com/test-image.jpg',
-        seed: -1
+        seed: -1,
+        generationId: `test-gen-${Date.now()}`,
+        enhancedPrompt: shouldEnhancePrompt ? finalPrompt : undefined
       };
     }
 
@@ -413,7 +418,128 @@ export class ReveAI {
     return {
       imageUrl: result.imageUrls[0],
       seed: result.seed,
+      generationId: generationIdFromResponse,
       enhancedPrompt: shouldEnhancePrompt && finalPrompt !== prompt ? finalPrompt : undefined
+    };
+  }
+
+  /**
+   * Edit a single image using Reve AI
+   * @param options Options for image editing
+   * @returns Promise resolving to the edit result with image URL, seed, generation ID, and edit details
+   */
+  private async editSingleImage(
+    options: EditImageOptions
+  ): Promise<{
+    imageUrl: string;
+    seed: number;
+    generationId: string;
+    instruction: string;
+    originatingGeneration: string;
+    annotatedPrompt?: string;
+  }> {
+    // Get project ID
+    const projectId = await this.getProjectId();
+
+    // Validate base image options (width, height)
+    validateImageOptions(
+      options.width, 
+      options.height
+      // Batch size is always 1 for single edit
+    );
+    
+    // Validate edit-specific options
+    validateEditImageOptions(options.instruction, options.originatingGeneration);
+
+    // Default values
+    const prompt = options.prompt; // Original prompt
+    const negativePrompt = options.negativePrompt || '';
+    const width = options.width || 1024;
+    const height = options.height || 1024;
+    const seed = options.seed === undefined ? -1 : options.seed;
+    const model = options.model || 'text2image_v1'; // Use a potentially different model for edits if needed? Keep same for now.
+    const instruction = options.instruction;
+    const originatingGeneration = options.originatingGeneration;
+    const annotatedPrompt = options.annotatedPrompt; // Use if provided
+
+    // Create a unique ID for the new generation (the edit result)
+    const newGenerationId = crypto.randomUUID ? crypto.randomUUID() : `edit-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+
+    // Format the payload according to the edit API requirements
+    const editPayload = {
+      data: {
+        client_metadata: {
+          aspectRatio: `${width}:${height}`,
+          instruction: instruction, // The edit instruction
+          optimizeEnabled: false, // No prompt optimization during edit
+          originatingGeneration: originatingGeneration, // ID of the image to edit
+          unexpandedPrompt: prompt, // Original prompt
+          // Include annotatedPrompt if provided
+          ...(annotatedPrompt && { annotatedPrompt: annotatedPrompt }),
+        },
+        inference_inputs: {
+          caption: prompt, // Use the original prompt for the edit caption
+          height: height,
+          negative_caption: negativePrompt,
+          seed: seed === -1 ? Math.floor(Math.random() * 10000000) : seed,
+          width: width
+        },
+        inference_model: model
+      },
+      node: {
+        description: "A generation which encapsulates a request to edit an image.",
+        id: newGenerationId,
+        name: "My Edit Generation" // Could customize this later
+      }
+    };
+    
+    if (this.options.verbose) {
+       console.log('Starting image edit with payload:', JSON.stringify(editPayload, null, 2));
+    }
+
+    // Start edit generation with the project ID
+    const editResponse = await this.apiClient.post(
+      `/api/project/${projectId}/generation`,
+      editPayload
+    );
+
+    // Special handling for testing
+    if (IS_TEST_ENV && !editResponse.data) {
+      return {
+        imageUrl: 'https://example.com/test-edited-image.jpg',
+        seed: seed,
+        generationId: `test-edit-${Date.now()}`,
+        instruction: instruction,
+        originatingGeneration: originatingGeneration,
+        annotatedPrompt: annotatedPrompt,
+      };
+    }
+
+    // Extract generation ID from the response
+    let generationIdFromResponse = null;
+    if (editResponse.data.create && editResponse.data.create.node && editResponse.data.create.node.id) {
+      generationIdFromResponse = editResponse.data.create.node.id;
+    } else if (editResponse.data.generation_id) { // Fallback for older format (less likely for new endpoint)
+      generationIdFromResponse = editResponse.data.generation_id;
+    }
+
+    if (!generationIdFromResponse) {
+      throw new ReveAIError(
+        'Failed to get generation ID from edit response: ' + JSON.stringify(editResponse.data),
+        ReveAIErrorType.UNEXPECTED_RESPONSE
+      );
+    }
+
+    // Poll for generation status
+    const result = await this.pollGenerationStatus(projectId, generationIdFromResponse);
+    
+    return {
+      imageUrl: result.imageUrls[0],
+      seed: result.seed,
+      generationId: generationIdFromResponse,
+      instruction: instruction,
+      originatingGeneration: originatingGeneration,
+      annotatedPrompt: annotatedPrompt, // Return it if it was used
     };
   }
 
@@ -472,7 +598,11 @@ export class ReveAI {
         .map(r => r.enhancedPrompt)
         .filter((p): p is string => p !== undefined);
         
+      // Collect all generation IDs
+      const generationIds = results.map(r => r.generationId);
+
       return {
+        generationIds,
         imageUrls: results.map(r => r.imageUrl),
         seed: results[0].seed, // Use the first seed as the reference
         completedAt: new Date(),
@@ -499,6 +629,68 @@ export class ReveAI {
       }
       
       throw handleAxiosError(error as Error, 'generating image', this.options.verbose);
+    }
+  }
+
+  /**
+   * Edit an existing image using Reve AI based on an instruction
+   * Note: This function currently only supports editing a single image at a time (batchSize=1).
+   * @param options Options for image editing, including the instruction and the ID of the image to edit
+   * @returns Promise resolving to the edit result with the new image URL
+   */
+  public async editImage(options: EditImageOptions): Promise<EditImageResult> {
+    try {
+      // Validate base image options (width, height)
+      validateImageOptions(
+        options.width, 
+        options.height
+        // Batch size implicitly 1 for edits currently
+      );
+      
+      // Validate edit-specific options
+      validateEditImageOptions(options.instruction, options.originatingGeneration);
+      
+      // --- Important: Edit does not support batching or prompt enhancement currently ---
+      // The reference fetch request doesn't show batching/multiple edits in one call,
+      // and prompt enhancement is not typically applied to edit instructions.
+      if ('batchSize' in options && options.batchSize && options.batchSize !== 1) {
+          console.warn('Batch size > 1 is not supported for editImage. Processing only the first edit.');
+      }
+      if ('enhancePrompt' in options && options.enhancePrompt === true) {
+          console.warn('Prompt enhancement is not supported for editImage.');
+      }
+
+      // Call the single edit function
+      const result = await this.editSingleImage({
+        ...options,
+      });
+
+      return {
+        generationId: result.generationId,
+        imageUrl: result.imageUrl,
+        seed: result.seed,
+        completedAt: new Date(),
+        prompt: options.prompt, // Original prompt
+        negativePrompt: options.negativePrompt || undefined,
+        instruction: result.instruction,
+        originatingGeneration: result.originatingGeneration,
+        annotatedPrompt: result.annotatedPrompt,
+      };
+      
+    } catch (error) {
+      // Special case for test environment (similar to generateImage)
+      if (IS_TEST_ENV) {
+        if (error instanceof Error && error.message.includes('Edit failed')) { // Adjust error message check if needed
+          throw new ReveAIError('Edit failed', ReveAIErrorType.GENERATION_ERROR);
+        }
+        
+        if (error instanceof Error && error.message.includes('timed out')) {
+          throw new ReveAIError('Edit polling timed out', ReveAIErrorType.POLLING_ERROR);
+        }
+      }
+      
+      // Use handleAxiosError for consistent error handling
+      throw handleAxiosError(error as Error, 'editing image', this.options.verbose);
     }
   }
 
@@ -645,4 +837,5 @@ export class ReveAI {
 }
 
 // Export types
-export * from './types'; 
+export * from './types';
+export * from './utils/helpers'; 
