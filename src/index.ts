@@ -687,7 +687,7 @@ export class ReveAI {
           originatingGeneration: originatingGeneration, // ID of the image to edit
           unexpandedPrompt: options.prompt, // Original prompt
           // Include annotatedPrompt if provided
-          ...(annotatedPrompt && { annotatedPrompt: annotatedPrompt }),
+          annotatedPrompt: finalEditCaption,
         },
         inference_inputs: {
           caption: finalEditCaption, // Use the NEWLY ENHANCED edit prompt here
