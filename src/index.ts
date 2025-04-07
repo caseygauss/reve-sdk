@@ -414,7 +414,40 @@ export class ReveAI {
               console.log("Raw chat response data:", JSON.stringify(response.data, null, 2));
           }
 
-          // --- Educated Guess for Response Structure ---
+          // --- Corrected Response Structure Parsing ---
+          if (typeof response.data?.response === 'string') {
+              try {
+                  const innerJson = JSON.parse(response.data.response);
+                  if (typeof innerJson?.prompt === 'string') {
+                      if (this.options.verbose) console.log("Found enhanced edit prompt in response.data.response (parsed inner JSON)");
+                      return innerJson.prompt;
+                  } else {
+                      if (this.options.verbose) console.warn("Parsed inner JSON from response.data.response, but 'prompt' field is missing or not a string.", innerJson);
+                  }
+              } catch (parseError) {
+                  if (this.options.verbose) console.error("Failed to parse JSON string from response.data.response:", parseError, "Raw string:", response.data.response);
+                  // Potentially fall through to other checks if parsing fails, or throw specific error?
+                  // Let's fall through for now.
+              }
+          }
+          
+          if (typeof response.data?.response === 'string') {
+            try {
+                const innerJson = JSON.parse(response.data.response);
+                if (typeof innerJson?.prompt === 'string') {
+                    if (this.options.verbose) console.log("Found enhanced edit prompt in response.data.response (parsed inner JSON)");
+                    return innerJson.prompt;
+                } else {
+                    if (this.options.verbose) console.warn("Parsed inner JSON from response.data.response, but 'prompt' field is missing or not a string.", innerJson);
+                }
+            } catch (parseError) {
+                if (this.options.verbose) console.error("Failed to parse JSON string from response.data.response:", parseError, "Raw string:", response.data.response);
+                // Potentially fall through to other checks if parsing fails, or throw specific error?
+                // Let's fall through for now.
+            }
+        }
+
+          // --- Fallback Educated Guesses (Keep just in case API changes) ---
           // Attempt 1: Direct content field
           if (typeof response.data?.content === 'string') {
               if (this.options.verbose) console.log("Found enhanced edit prompt in response.data.content");
