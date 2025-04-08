@@ -15,7 +15,7 @@ async function handleGenerate(request, env) {
         cookie: credentials.cookie,
       },
       projectId: credentials.projectId || undefined, // Fallback to auto-detection if not set in KV
-      verbose: false,
+      verbose: true,
     });
 
     // ... existing code ...
@@ -51,7 +51,7 @@ async function handleEdit(request, env) {
         // reve_version: credentials.reveVersion, // Assuming SDK doesn't strictly need this
       },
       projectId: credentials.projectId || undefined,
-      verbose: false, // Keep verbose off unless debugging
+      verbose: true, // Keep verbose off unless debugging
     });
 
     // Edit image using the SDK
