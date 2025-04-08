@@ -65,6 +65,7 @@ export class ReveAI {
       headers: {
         'accept': '*/*',
         'accept-language': 'en-US,en;q=0.9',
+        'cache-control': 'max-age=0, no-cache, must-revalidate, proxy-revalidate',
         'origin': 'https://preview.reve.art',
         'referer': 'https://preview.reve.art/app',
         'sec-fetch-dest': 'empty',
@@ -395,14 +396,7 @@ export class ReveAI {
           const response = await this.apiClient.post(
               '/api/misc/chat',
               // The body needs to be stringified based on the example fetch
-              JSON.stringify(conversationPayload),
-              {
-                  // Override content-type specifically for this request if the interceptor doesn't handle it
-                  headers: {
-                      'content-type': 'application/json; charset=utf-8',
-                      'accept': '*/*', // Reiterate accept based on example
-                  }
-              }
+              JSON.stringify(conversationPayload)
           );
 
           // Now, parse the response to find the enhanced edit prompt.
