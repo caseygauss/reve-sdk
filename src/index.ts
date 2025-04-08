@@ -73,7 +73,7 @@ export class ReveAI {
         'sec-fetch-site': 'same-origin',
         'sec-gpc': '1',
         'te': 'trailers',
-        'user-agent': this.options.customHeaders?.['user-agent'] ?? 'ReveAI-SDK/1.0',
+        'user-agent': this.options.customHeaders?.['user-agent'] ?? 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
         ...this.options.customHeaders,
         'content-type': 'application/json; charset=utf-8',
       },
