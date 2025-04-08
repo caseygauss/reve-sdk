@@ -519,7 +519,7 @@ export class ReveAI {
     const width = options.width || 1024;
     const height = options.height || 1024;
     const seed = options.seed === undefined ? -1 : options.seed;
-    const model = options.model || 'text2image_v1/prod/20250325-2246';
+    const model = options.model || 'text2image_v1';
     const shouldEnhancePrompt = options.enhancePrompt ?? true;
 
     // Use the provided enhanced prompt or the original
@@ -669,7 +669,7 @@ export class ReveAI {
     const height = options.height || 1024;
     // Use the seed from options if provided, otherwise generate a new random one for the edit
     const seed = options.seed === undefined ? Math.floor(Math.random() * 1000000000) : options.seed;
-    const model = options.model || 'text2image_v1/prod/20250325-2246'; // Use same model as generate? Or specific edit model?
+    const model = options.model || 'text2image_v1'; // Use same model as generate? Or specific edit model?
     const negativePrompt = options.negativePrompt || '';
     const instruction = options.instruction;
     const originatingGeneration = options.originatingGeneration;
