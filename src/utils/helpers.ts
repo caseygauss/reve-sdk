@@ -156,29 +156,6 @@ export function validateImageOptions(
 }
 
 /**
- * Validate image edit options to ensure required fields are present
- * @param instruction The edit instruction
- * @param originatingGeneration The ID of the original generation
- */
-export function validateEditImageOptions(
-  instruction?: string,
-  originatingGeneration?: string
-): void {
-  if (!instruction) {
-    throw new ReveAIError(
-      'Edit instruction is required for image editing',
-      ReveAIErrorType.GENERATION_ERROR
-    );
-  }
-  if (!originatingGeneration) {
-    throw new ReveAIError(
-      'Originating generation ID is required for image editing',
-      ReveAIErrorType.GENERATION_ERROR
-    );
-  }
-}
-
-/**
  * Parse JWT token to extract user information
  * @param token JWT token string
  * @returns Decoded token payload

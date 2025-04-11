@@ -118,46 +118,13 @@ export interface GenerateImageOptions {
 }
 
 /**
- * Options for editing an existing image
+ * Result of an image generation
  */
-export interface EditImageOptions extends Omit<GenerateImageOptions, 'batchSize' | 'enhancePrompt'> {
+export interface GenerateImageResult {
   /**
-   * The instruction describing the edit to be applied
+   * Array of URLs to the generated images
    */
-  instruction: string;
-
-  /**
-   * The generation ID of the image to be edited
-   */
-  originatingGeneration: string;
-
-  /**
-   * Optional: The enhanced prompt (caption) from the original image generation.
-   * Used as context for generating the edit prompt.
-   */
-  originalCaption?: string;
-
-  /**
-   * Optional: Annotated prompt (if available from a previous step or context)
-   * This can sometimes help guide the edit more precisely.
-   */
-  annotatedPrompt?: string;
-}
-
-/**
- * Result of an image generation or edit operation
- */
-export interface BaseImageResult {
-  /**
-   * Unique ID for the generated image
-   * Note: For batch operations, this reflects the ID of the *first* image.
-   */
-  generationId: string;
-
-  /**
-   * URL to the generated image
-   */
-  imageUrl: string;
+  imageUrls: string[];
 
   /**
    * The seed that was used for generation
@@ -175,62 +142,15 @@ export interface BaseImageResult {
   prompt: string;
 
   /**
-   * Any negative prompt used for generation
-   */
-  negativePrompt?: string;
-}
-
-/**
- * Result of an image generation operation
- */
-export interface GenerateImageResult {
-  /**
-   * Array of unique IDs for each generated image in the batch
-   */
-  generationIds: string[];
-
-  /**
-   * Array of URLs to the generated images
-   */
-  imageUrls: string[];
-
-  /**
-   * The seed that was used for generation (usually the seed of the first image)
-   */
-  seed: number;
-
-  /**
-   * Timestamp when the generation was completed
-   */
-  completedAt: Date;
-
-  /**
-   * The original prompt used for generation
-   */
-  prompt: string;
-
-  /**
-   * The actual caption used for generation (could be the original or enhanced prompt).
-   * Only provided when batch size is 1.
-   */
-  caption?: string;
-
-  /**
-   * Array of all captions used for generation (could be original or enhanced prompts).
-   * Only provided when batch size > 1.
-   */
-  captions?: string[];
-
-  /**
-   * The enhanced prompt used for generation (if prompt enhancement was enabled).
-   * For single image generations, this will be the enhanced prompt used.
-   * For multi-image generations, this will be the first enhanced prompt used.
+   * The enhanced prompt used for generation (if prompt enhancement was enabled)
+   * For single image generations, this will be the enhanced prompt used
+   * For multi-image generations, this will be the first enhanced prompt used
    */
   enhancedPrompt?: string;
 
   /**
-   * Array of all enhanced prompts used for generation (for multi-image generations).
-   * Only provided when batch size > 1 and multiple different enhanced prompts were used.
+   * Array of all enhanced prompts used for generation (for multi-image generations)
+   * Only provided when batch size > 1 and multiple different enhanced prompts were used
    */
   enhancedPrompts?: string[];
 
@@ -238,31 +158,6 @@ export interface GenerateImageResult {
    * Any negative prompt used for generation
    */
   negativePrompt?: string;
-}
-
-/**
- * Result of an image edit operation
- */
-export interface EditImageResult extends BaseImageResult {
-  /**
-   * The instruction used for the edit
-   */
-  instruction: string;
-
-  /**
-   * The generation ID of the original image that was edited
-   */
-  originatingGeneration: string;
-
-  /**
-   * The final enhanced prompt generated and used for this specific edit.
-   */
-  finalCaption: string;
-
-  /**
-   * The annotated prompt that might have been used during the edit
-   */
-  annotatedPrompt?: string;
 }
 
 /**
