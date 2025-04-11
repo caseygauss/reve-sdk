@@ -74,18 +74,23 @@ export class ReveAI {
       baseURL: this.options.baseUrl,
       timeout: this.options.timeout,
       headers: {
-        'content-type': 'application/json',
+        // Match browser headers more closely
         'accept': '*/*',
-        'accept-language': 'en-US,en;q=0.5',
+        'accept-language': 'en-US,en;q=0.9', // Match browser
+        'content-type': 'application/json',
         'origin': 'https://preview.reve.art',
         'referer': 'https://preview.reve.art/app',
-        'dnt': '1',
         'sec-fetch-dest': 'empty',
         'sec-fetch-mode': 'cors',
         'sec-fetch-site': 'same-origin',
-        'sec-gpc': '1',
-        'te': 'trailers',
-        'user-agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0',
+        // Use a more common browser User-Agent (Example: Chrome on Android from your log)
+        // Note: Ideally, this could be made configurable or randomized slightly
+        'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Mobile Safari/537.36',
+        // Removed headers not present in browser request: 'dnt', 'sec-gpc', 'te'
+        // Attempt to add sec-ch-ua headers (might be ignored or detected as static)
+        'sec-ch-ua': '"Google Chrome";v="135", "Not-A.Brand";v="8", "Chromium";v="135"',
+        'sec-ch-ua-mobile': '?1',
+        'sec-ch-ua-platform': '"Android"',
         ...this.options.customHeaders,
       },
     });
@@ -305,7 +310,8 @@ export class ReveAI {
           num_variants: numVariants,
           prompt: prompt
         },
-        model_id: "promptenhancer_v1/prod/20250224-0952",
+        // Use the model_id observed from the browser request
+        model_id: "promptenhancer_v1",
         project_id: await this.getProjectId()
       };
 
