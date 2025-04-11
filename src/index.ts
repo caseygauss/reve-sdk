@@ -513,130 +513,98 @@ export class ReveAI {
     seed: number;
   }> {
     let attempts = 0;
-    const startTime = Date.now(); // Debug: Track total time
-
+    
     while (attempts < this.options.maxPollingAttempts) {
-      const loopStartTime = Date.now(); // Debug: Track time per loop
       try {
         // Poll the node endpoint to check for generation status
-        if (this.options.verbose || IS_TEST_ENV) { // Debug: Always log start in test/verbose
-           console.log(`Polling attempt ${attempts + 1}/${this.options.maxPollingAttempts} for generation ${generationId}...`);
-        }
         const nodeResponse = await this.apiClient.get(`/api/project/${projectId}/node`);
-
-        // Debug: Log response status and list size
-        console.log(`Node response status: ${nodeResponse.status}`);
-        const nodeList = nodeResponse.data?.list;
-
-        if (nodeList && Array.isArray(nodeList)) {
-          console.log(`Node list received, size: ${nodeList.length}`); // Debug: Log list size
-
-          // Find our generation in the list
-          const findStartTime = Date.now(); // Debug: Time the find operation
-          const ourGeneration = nodeList.find((item: { node?: { id: string } }) =>
+        
+        if (this.options.verbose) {
+          console.log(`Polling generation status (attempt ${attempts + 1}/${this.options.maxPollingAttempts})`);
+        }
+        
+        // Find our generation in the list
+        if (nodeResponse.data && nodeResponse.data.list && Array.isArray(nodeResponse.data.list)) {
+          const ourGeneration = nodeResponse.data.list.find((item: { node?: { id: string } }) => 
             item.node && item.node.id === generationId
           );
-          console.log(`Finding node took ${Date.now() - findStartTime}ms`); // Debug: Log find duration
-
+          
           if (ourGeneration) {
-             console.log('Found our generation node:', JSON.stringify(ourGeneration, null, 2)); // Debug: Log the found node structure
-
             // Check if we have an output (which means the generation is complete)
             if (ourGeneration.data && ourGeneration.data.output) {
               const imageId = ourGeneration.data.output;
-              const seed = ourGeneration.data.inference_inputs?.seed ?? -1; // Use nullish coalescing
-
-              console.log(`Generation complete! Found image ID: ${imageId}, Seed: ${seed}`); // Debug: Log success
-
+              const seed = ourGeneration.data.inference_inputs?.seed || -1;
+              
+              if (this.options.verbose) {
+                console.log(`Generation complete, found image ID: ${imageId}`);
+              }
+              
               // Fetch the actual image content
               try {
-                console.log(`Attempting to fetch image URL for ID: ${imageId}`); // Debug: Log image fetch start
                 const imageResponse = await this.apiClient.get(
-                  `/api/project/${projectId}/image/${imageId}/url`,
-                  {
-                    responseType: 'arraybuffer', // Keep as arraybuffer for now
+                  `/api/project/${projectId}/image/${imageId}/url`, 
+                  { 
+                    responseType: 'arraybuffer',
                     headers: {
-                      'Accept': 'image/webp,*/*' // Keep Accept header
+                      'Accept': 'image/webp,*/*'
                     }
                   }
                 );
-
-                console.log(`Image fetch successful, status: ${imageResponse.status}, content-type: ${imageResponse.headers['content-type']}`); // Debug: Log image fetch success
-
-                // Convert the binary data to base64 using standard Web APIs (safer for CF Workers)
-                const arrayBuffer = imageResponse.data as ArrayBuffer;
-                const uint8Array = new Uint8Array(arrayBuffer);
-                let binaryString = '';
-                uint8Array.forEach((byte) => {
-                   binaryString += String.fromCharCode(byte);
-                });
-                const base64Image = btoa(binaryString); // Standard Base64 encoding
-
+                
+                // Convert the binary data to base64
+                const base64Image = Buffer.from(imageResponse.data).toString('base64');
                 const mimeType = imageResponse.headers['content-type'] || 'image/webp';
                 const dataUrl = `data:${mimeType};base64,${base64Image}`;
-
-                console.log(`Successfully converted image to base64 data URL (length: ${dataUrl.length})`); // Debug: Log conversion success
-
+                
+                if (this.options.verbose) {
+                  console.log(`Successfully fetched and converted image to base64`);
+                }
+                
                 return {
                   imageUrls: [dataUrl],
                   seed
                 };
               } catch (imageError) {
-                // Debug: ALWAYS log image fetch errors thoroughly
-                console.error(`ERROR fetching or processing image content for ID ${imageId}:`, imageError instanceof Error ? imageError.message : imageError);
-                 if (axios.isAxiosError(imageError) && imageError.response) {
-                    console.error('Image fetch error response data:', imageError.response.data);
-                    console.error('Image fetch error response status:', imageError.response.status);
-                 }
-                 console.error('Image fetch failed, will retry polling...');
-                 // Consider if we should abort polling on certain image fetch errors (e.g., 404 Not Found)
-
+                if (this.options.verbose) {
+                  console.log(`Failed to fetch image content: ${(imageError as Error).message}, will retry...`);
+                }
+                
                 // Wait and continue polling
                 await delay(this.options.pollingInterval);
                 attempts++;
-                continue; // Continue to next polling attempt
+                continue;
               }
             } else if (ourGeneration.data && ourGeneration.data.error) {
               // Generation failed
-              console.error(`Generation failed with error in node data: ${ourGeneration.data.error}`); // Debug: Log specific error
               throw new ReveAIError(
                 `Generation failed: ${ourGeneration.data.error}`,
                 ReveAIErrorType.GENERATION_ERROR
               );
             } else {
               // Still processing
-              if (this.options.verbose || IS_TEST_ENV) { // Debug: Log progress
-                  console.log('Generation still in progress (no output or error field yet)...');
+              if (this.options.verbose) {
+                console.log('Generation still in progress...');
               }
             }
           } else {
             // Our generation wasn't found in the list
-            if (this.options.verbose || IS_TEST_ENV) { // Debug: Log not found
-              console.log(`Generation ID ${generationId} not found in node list this time, will retry...`);
+            if (this.options.verbose) {
+              console.log(`Generation ID ${generationId} not found in node list, will retry...`);
             }
           }
-        } else {
-           // Debug: Log if the response structure is unexpected
-           console.warn('Node response data or list is missing/invalid:', JSON.stringify(nodeResponse.data));
         }
-
+        
         // Wait and try again
-        console.log(`Polling loop ${attempts + 1} took ${Date.now() - loopStartTime}ms. Waiting ${this.options.pollingInterval}ms...`); // Debug: Log loop duration and wait time
         await delay(this.options.pollingInterval);
         attempts++;
       } catch (error) {
-         // Debug: Log polling loop errors
-         console.error(`Error during polling attempt ${attempts + 1}:`, error instanceof Error ? error.message : error);
         if (error instanceof ReveAIError) {
-          throw error; // Re-throw known SDK errors
+          throw error;
         }
-        // Handle potential Axios errors specifically if needed, otherwise wrap
         throw handleAxiosError(error as Error, 'polling generation status', this.options.verbose);
       }
     }
-
-    // Timeout occurred
-    console.error(`Generation polling timed out after ${attempts} attempts and ${Date.now() - startTime}ms.`); // Debug: Log timeout details
+    
     throw new ReveAIError(
       `Generation timed out after ${attempts} polling attempts`,
       ReveAIErrorType.POLLING_ERROR
