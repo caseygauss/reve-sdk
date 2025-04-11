@@ -14,6 +14,26 @@ export interface AuthOptions {
 }
 
 /**
+ * Configuration for Smartproxy integration
+ */
+export interface ProxyConfig {
+  /**
+   * Smartproxy username
+   */
+  username: string;
+
+  /**
+   * Smartproxy password
+   */
+  password: string;
+
+  /**
+   * Array of Smartproxy endpoints (e.g., ["us.smartproxy.com:10000", "eu.smartproxy.com:20000"])
+   */
+  endpoints: string[];
+}
+
+/**
  * Configuration options for the Reve AI SDK
  */
 export interface ReveAIOptions {
@@ -63,6 +83,11 @@ export interface ReveAIOptions {
    * These will be merged with the default headers
    */
   customHeaders?: Record<string, string>;
+
+  /**
+   * Optional configuration for using Smartproxy
+   */
+  proxyConfig?: ProxyConfig;
 }
 
 /**

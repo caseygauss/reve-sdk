@@ -6,6 +6,7 @@ import {
   GenerateImageResult,
   ReveAIError,
   ReveAIErrorType,
+  ProxyConfig,
 } from './types';
 import { delay, handleAxiosError, validateImageOptions, parseJwt } from './utils/helpers';
 
@@ -17,15 +18,17 @@ export const IS_TEST_ENV = process.env.NODE_ENV === 'test';
  */
 export class ReveAI {
   private apiClient: AxiosInstance;
-  private options: Required<Omit<ReveAIOptions, 'auth' | 'projectId'>> & { 
+  private options: Required<Omit<ReveAIOptions, 'auth' | 'projectId' | 'proxyConfig'>> & {
     auth: ReveAIOptions['auth'];
     projectId?: string;
+    proxyConfig?: ProxyConfig;
     verbose: boolean;
     customHeaders: ReveAIOptions['customHeaders'];
   };
   private token: string | null = null;
   private refreshToken: string | null = null;
   private userId: string | null = null;
+  private proxyIndex: number = 0;
 
   /**
    * Create a new instance of the Reve AI SDK
@@ -44,7 +47,16 @@ export class ReveAI {
         ReveAIErrorType.AUTHENTICATION_ERROR
       );
     }
-    
+
+    if (options.proxyConfig) {
+      if (!options.proxyConfig.username || !options.proxyConfig.password || !options.proxyConfig.endpoints || options.proxyConfig.endpoints.length === 0) {
+        throw new ReveAIError(
+          'Proxy configuration requires username, password, and at least one endpoint',
+          ReveAIErrorType.AUTHENTICATION_ERROR
+        );
+      }
+    }
+
     this.options = {
       auth: options.auth,
       projectId: options.projectId || undefined,
@@ -54,6 +66,7 @@ export class ReveAI {
       pollingInterval: options.pollingInterval ?? 2000,
       verbose: options.verbose ?? false,
       customHeaders: options.customHeaders ?? {},
+      proxyConfig: options.proxyConfig,
     };
 
     // Create axios instance with default configuration
@@ -86,6 +99,51 @@ export class ReveAI {
       const decoded = parseJwt(this.token);
       this.userId = decoded.sub ? String(decoded.sub) : null;
     }
+
+    // Add request interceptor for proxy rotation (BEFORE other interceptors)
+    this.apiClient.interceptors.request.use(
+      (config) => {
+        if (this.options.proxyConfig && this.options.proxyConfig.endpoints.length > 0) {
+          const { username, password, endpoints } = this.options.proxyConfig;
+          
+          // Get the current endpoint and update the index for the next request
+          const endpoint = endpoints[this.proxyIndex];
+          this.proxyIndex = (this.proxyIndex + 1) % endpoints.length;
+          
+          // Parse host and port
+          const [host, portStr] = endpoint.split(':');
+          const port = parseInt(portStr, 10);
+
+          if (!host || isNaN(port)) {
+             console.error(`Invalid proxy endpoint format: ${endpoint}. Skipping proxy for this request.`);
+             return config; // Skip proxy if format is invalid
+          }
+          
+          // Set proxy config for Axios
+          config.proxy = {
+            protocol: 'http', // Assuming http proxy
+            host: host,
+            port: port,
+            auth: {
+              username: username,
+              password: password,
+            },
+          };
+          
+          if (this.options.verbose) {
+            console.log(`🔄 Using proxy: ${host}:${port}`);
+          }
+        }
+        return config;
+      },
+      (error) => {
+         // Handle proxy setup errors if needed, though unlikely here
+         if (this.options.verbose) {
+           console.error('❌ Proxy Interceptor Error:', error.message);
+         }
+         return Promise.reject(error);
+      }
+    );
 
     // Setup axios retry
     axiosRetry(this.apiClient, { 
